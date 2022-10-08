@@ -795,7 +795,8 @@ ENDTEXT
       elsif (!defined $blame_split_idx && ($base_path ne $bug_blame)) {
         my @words = split /\//, $bug_blame;
         $blame_split_idx = 0;
-        while ($words[$blame_split_idx] eq $blame_split_finder[$blame_split_idx]) {
+        while (defined $words[$blame_split_idx] && defined $blame_split_finder[$blame_split_idx] &&
+               ($words[$blame_split_idx] eq $blame_split_finder[$blame_split_idx])) {
             $blame_split_idx++;
         }
       }
@@ -812,15 +813,20 @@ ENDTEXT
         if ($current_index < $blame_split_idx) { $blame_split_idx = $current_index; }
       }
     }
-    # Now that we know blame_split_idx we can split path downwards from it.
-    for my $row ( @Index ) {
-      my $bug_type = ($row->[2]);
-      my $bug_category = ($row->[1]);
-      my $bug_blame=($row->[3]);
-      my @words = split /\//, $bug_blame;
-      my $currTeam = $words[$blame_split_idx];
-      if (!defined $Totals_blame{$currTeam}) { $Totals_blame{$currTeam} = [1,$bug_category,$bug_type]; }
-      else { $Totals_blame{$currTeam}->[0]++; }
+    if( defined $blame_split_idx)
+    {
+      # Now that we know blame_split_idx we can split path downwards from it.
+      for my $row ( @Index ) {
+        my $bug_type = ($row->[2]);
+        my $bug_category = ($row->[1]);
+        my $bug_blame=($row->[3]);
+        my @words = split /\//, $bug_blame;
+        if(defined $words[$blame_split_idx]) {
+          my $currTeam = $words[$blame_split_idx];
+          if (!defined $Totals_blame{$currTeam}) { $Totals_blame{$currTeam} = [1,$bug_category,$bug_type]; }
+          else { $Totals_blame{$currTeam}->[0]++; }
+        }
+      }
     }
 print OUT <<ENDTEXT;
 <br>
@@ -981,9 +987,13 @@ ENDTEXT
       my $ReportFile = $row->[0];
       my $bug_blame=($row->[3]);
       my @words = split /\//, $bug_blame;
-      my $currTeam = $words[$blame_split_idx];
+      if(defined $blame_split_idx) {
+        my $currTeam = $words[$blame_split_idx];
+        if(defined $currTeam) {
+          print OUT "<tr class=\"bt_$x team_$currTeam\">";
+        }
+      }
 
-      print OUT "<tr class=\"bt_$x team_$currTeam\">";
       print OUT "<td class=\"DESC\">";
       print OUT $row->[1];
       print OUT "</td>";

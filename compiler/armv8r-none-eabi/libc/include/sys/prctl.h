@@ -130,6 +130,17 @@ struct prctl_mm_map {
 #define PR_CAP_AMBIENT_LOWER    3
 #define PR_CAP_AMBIENT_CLEAR_ALL 4
 
+#define PR_SET_TAGGED_ADDR_CTRL 55
+#define PR_GET_TAGGED_ADDR_CTRL 56
+#define PR_TAGGED_ADDR_ENABLE (1UL << 0)
+#define PR_MTE_TCF_SHIFT 1
+#define PR_MTE_TCF_NONE  (0UL << 1)
+#define PR_MTE_TCF_SYNC  (1UL << 1)
+#define PR_MTE_TCF_ASYNC (2UL << 1)
+#define PR_MTE_TCF_MASK  (3UL << 1)
+#define PR_MTE_TAG_SHIFT 3
+#define PR_MTE_TAG_MASK  (0xffffUL << 3)
+
 int prctl (int, ...);
 
 #ifdef __cplusplus

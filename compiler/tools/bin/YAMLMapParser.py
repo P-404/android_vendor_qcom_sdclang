@@ -26,6 +26,14 @@ class YAMLFile(object):
         self.unused = {}
         self.object_map_code = {}
         self.unused_symbols = []
+        self.loaded_sections = set()
+        if 'LoadRegions' not in self.yamlfile:
+            return
+        for region in self.yamlfile['LoadRegions']:
+            if 'Sections' not in region or 'PT_LOAD' not in region['Type']:
+                continue
+            for section in region['Sections']:
+                self.loaded_sections.add(section)
 
     def get_architecture(self):
         '''Return Header->Architecture.'''
@@ -38,6 +46,12 @@ class YAMLFile(object):
     def get_address_size(self):
         '''Return Header->AddressSize.'''
         return self.yamlfile['Header']['AddressSize']
+
+    def is_no_load(self, osection):
+        '''Return True if output section is not loaded otherwise False'''
+        if 'Name' not in osection:
+            return False
+        return osection['Name'] not in self.loaded_sections
 
     def is_code(self, item):
         '''Return True if item is code, otherwise return False.'''
@@ -186,7 +200,8 @@ class YAMLFile(object):
                 'ro_data': 0,
                 'rw_data': 0,
                 'zi_data': 0,
-                'debug': 0
+                'debug': 0,
+                'no_load': 0
                 }
         obj_totals = self.get_object_totals()
         lib_totals = self.get_library_totals()
@@ -207,7 +222,8 @@ class YAMLFile(object):
                 'ro_data': 0,
                 'rw_data': 0,
                 'zi_data': 0,
-                'debug': 0
+                'debug': 0,
+                'no_load' : 0
                 }
         self.generated[sec_type] += self.get_size(section)
 
@@ -216,8 +232,7 @@ class YAMLFile(object):
         origin = self.get_origin(section)
         if 'Name' not in section:
             return False
-        # FIXME: Add support for Linker script PADDING.
-        if section['Name'] == "ALIGNMENT_PADDING" :
+        if section['Name'] in {"ALIGNMENT_PADDING", "LINKER_SCRIPT_PADDING"} :
             if not self.generated:
                 self.generated = {
                     'code': 0,
@@ -225,7 +240,8 @@ class YAMLFile(object):
                     'ro_data': 0,
                     'rw_data': 0,
                     'zi_data': 0,
-                    'debug': 0
+                    'debug': 0,
+                    'no_load' : 0
                     }
             self.generated[sec_type] += self.get_size(section)
             return True
@@ -237,7 +253,8 @@ class YAMLFile(object):
                     'ro_data': 0,
                     'rw_data': 0,
                     'zi_data': 0,
-                    'debug': 0
+                    'debug': 0,
+                    'no_load' : 0
                     }
             self.lib_objs[origin][sec_type] += self.get_size(section)
             return True
@@ -249,7 +266,8 @@ class YAMLFile(object):
                     'ro_data': 0,
                     'rw_data': 0,
                     'zi_data': 0,
-                    'debug': 0
+                    'debug': 0,
+                    'no_load' : 0
                     }
             self.objs[origin][sec_type] += self.get_size(section)
             return True
@@ -263,13 +281,15 @@ class YAMLFile(object):
             sec_type = self.get_section_type(osection)
             if not sec_type:
                 continue
+            if self.is_no_load(osection):
+                sec_type = 'no_load'
             ret = False
             if osection['Contents'] is None:
                 self.update_object_sizes_no_content(osection, sec_type)
                 continue
             for isection in osection['Contents']:
                 new_sec_type = self.get_section_type(isection)
-                if (new_sec_type is None):
+                if (new_sec_type is None or sec_type == 'no_load'):
                     new_sec_type = sec_type
                 newret = self.update_object_sizes(isection, new_sec_type)
                 if newret is True:
@@ -631,7 +651,8 @@ class YAMLFile(object):
                 'ro_data': 0,
                 'rw_data': 0,
                 'zi_data': 0,
-                'debug': 0
+                'debug': 0,
+                'no_load': 0
                 }
         return self.generated
 
@@ -655,7 +676,8 @@ class YAMLFile(object):
                     'ro_data': 0,
                     'rw_data': 0,
                     'zi_data': 0,
-                    'debug': 0
+                    'debug': 0,
+                    'no_load' : 0
                     }
             for t in v:
                 self.libs[libname][t] += v[t]
@@ -683,7 +705,8 @@ class YAMLFile(object):
             'ro_data': 0,
             'rw_data': 0,
             'zi_data': 0,
-            'debug': 0
+            'debug': 0,
+            'no_load' : 0
             }
         lib_objs = self.get_library_member_sizes()
         for k, v in lib_objs.items():
@@ -743,6 +766,7 @@ class YAMLFile(object):
     def has_key_word(self, item):
         '''Return True if item is in file, otherwise return False.'''
         return item in self.yamlfile
+
 
 def get_library_name(s):
     '''Return library name.'''
@@ -966,6 +990,9 @@ def handle_totals(yamlfile):
                       + grand_totals['ro_data'] + grand_totals['rw_data'])
     print("   Total ROM Size (Code + RO Data + RW Data){0:11d} ({1:7.2f}kB)"
           .format(total_rom_size,total_rom_size/1024.0))
+    not_loaded = grand_totals['no_load']
+    print("   Total Size (sections not loaded)         {0:11d} ({1:7.2f}kB)"
+          .format(not_loaded,not_loaded/1024.0))
     print("=============================================================================")
 
 
